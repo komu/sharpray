@@ -1,8 +1,9 @@
 ﻿namespace SharpRay.Core
 
-type Ray(start: Vector, dir: Vector) =
-    member r.Start = start
-    member r.Dir = dir
+type Ray = {
+    Start: Vector
+    Dir: Vector
+}
 
 type Surface =
     abstract Diffuse : Vector -> Color
@@ -25,15 +26,17 @@ module Surfaces =
         member x.Roughness = 150.0
     }
 
-type Light(pos: Vector, color: Color) =
-    member x.Pos = pos
-    member x.Color = color
+type Light = {
+    Pos: Vector
+    Color: Color
+}
 
-type Camera(pos: Vector, forward: Vector, up: Vector, right: Vector) =
-    member x.Pos = pos
-    member x.Forward = forward
-    member x.Up = up
-    member x.Right = right
+type Camera = {
+    Pos: Vector
+    Forward: Vector
+    Up: Vector
+    Right: Vector
+}
 
 module Cam =
     let create (pos: Vector) (lookAt: Vector) =
@@ -42,7 +45,7 @@ module Cam =
         let right = 1.5 * Vec.normalize(Vec.cross forward down)
         let up = 1.5 * Vec.normalize(Vec.cross forward right)
 
-        Camera(pos, forward, up, right)
+        { Pos=pos; Forward=forward; Up=up; Right=right }
 
 type SceneObject =
     abstract Surface : Surface
@@ -120,7 +123,7 @@ module Tracer =
         for light in scene.Lights do
             let ldis = light.Pos - pos
             let livec = Vec.normalize ldis
-            let neatIntersection = testRay (Ray(pos, livec)) scene
+            let neatIntersection = testRay { Start=pos; Dir=livec } scene
             let visible = (square neatIntersection > ldis.MagnitudeSquared) || (neatIntersection = 0.0)
             if visible then
                 let illum = Vec.dot livec norm
@@ -131,7 +134,7 @@ module Tracer =
         ret
 
     and reflectionColor (thing: SceneObject) (pos: Vector) (norm: Vector) (rd: Vector) (scene: Scene) (depth: int) =
-        thing.Surface.Reflect(pos) * traceRay (Ray(pos, rd)) scene (depth + 1)
+        thing.Surface.Reflect(pos) * traceRay { Start=pos; Dir=rd } scene (depth + 1)
 
     and shade (isect: Intersection) (scene: Scene) (depth: int) =
         let d = isect.Ray.Dir
@@ -147,9 +150,9 @@ module Tracer =
     let render (screenWidth: int) (screenHeight: int) (setPixel: System.Action<int,int,System.Drawing.Color>) (scene: Scene) =
         let screen = ScreenDimensions(screenWidth, screenHeight)
         
-        for y in 0..screenHeight-1 do
-            for x in 0..screenWidth-1 do
-                let color = traceRay (Ray(scene.Camera.Pos, (screen.GetPoint (float x) (float y) scene.Camera))) scene 0
+        for y = 0 to screenHeight-1 do
+            for x = 0 to screenWidth-1 do
+                let color = traceRay { Start=scene.Camera.Pos; Dir=screen.GetPoint (float x) (float y) scene.Camera } scene 0
                 setPixel.Invoke(x, y, color.AsDrawingColor)
 
 module Scenes =
@@ -160,9 +163,9 @@ module Scenes =
                 Sphere(new Vector(-1.0, 0.5, 1.5), 0.5, Surfaces.shiny);
               |],
              [|
-                Light(Vector(-2.0,2.5,0.0), Color(0.49,0.07,0.07));
-                Light(Vector(1.5,2.5,1.5),  Color(0.07,0.07,0.49));
-                Light(Vector(1.5,2.5,-1.5), Color(0.07,0.49,0.071));
-                Light(Vector(0.0,3.5,0.0),  Color(0.21,0.21,0.35))
+                { Pos=Vector(-2.0,2.5,0.0); Color=Color(0.49,0.07,0.07) };
+                { Pos=Vector(1.5,2.5,1.5);  Color=Color(0.07,0.07,0.49) };
+                { Pos=Vector(1.5,2.5,-1.5); Color=Color(0.07,0.49,0.071) };
+                { Pos=Vector(0.0,3.5,0.0);  Color=Color(0.21,0.21,0.35) }
              |],
              Cam.create (Vector(3.0, 2.0, 4.0)) (Vector(-1.0, 0.5, 0.0)))
