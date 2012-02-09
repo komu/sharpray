@@ -191,3 +191,26 @@ module Tracer =
         if depth >= MaxDepth
             then ret + Color(0.5, 0.5, 0.5)
             else ret + reflectionColor isect.Thing (pos + 0.001*reflectDir) normal reflectDir scene depth
+
+    let render (screenWidth: int) (screenHeight: int) (setPixel: System.Action<int,int,System.Drawing.Color>) (scene: Scene) =
+        let screen = ScreenDimensions(screenWidth, screenHeight)
+        
+        for y in 0..screenHeight-1 do
+            for x in 0..screenWidth-1 do
+                let color = traceRay (Ray(scene.Camera.Pos, (screen.GetPoint (float x) (float y) scene.Camera))) scene 0
+                setPixel.Invoke(x, y, Col.toDrawingColor color)
+
+module Scenes =
+    let defaultScene =
+        Scene([|
+                Plane(new Vector(0.0, 1.0, 0.0), 0.0, Surfaces.checkerboard);
+                Sphere(new Vector(0.0, 1.0, 0.0), 1.0, Surfaces.shiny);
+                Sphere(new Vector(-1.0, 0.5, 1.5), 0.5, Surfaces.shiny);
+              |],
+             [|
+                Light(Vector(-2.0,2.5,0.0), Color(0.49,0.07,0.07));
+                Light(Vector(1.5,2.5,1.5),  Color(0.07,0.07,0.49));
+                Light(Vector(1.5,2.5,-1.5), Color(0.07,0.49,0.071));
+                Light(Vector(0.0,3.5,0.0),  Color(0.21,0.21,0.35))
+             |],
+             Cam.create (Vector(3.0, 2.0, 4.0)) (Vector(-1.0, 0.5, 0.0)))

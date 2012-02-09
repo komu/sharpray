@@ -49,7 +49,6 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RayTracer.cs" />
     <Compile Include="RayTracerForm.cs">
       <SubType>Form</SubType>
     </Compile>

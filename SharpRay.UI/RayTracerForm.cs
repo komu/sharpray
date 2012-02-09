@@ -6,7 +6,8 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using RayTracer;
+using Microsoft.FSharp.Core;
+using SharpRay.Core.Basic;
 
 namespace SharpRay.UI
 {
@@ -37,14 +38,15 @@ namespace SharpRay.UI
         private void RayTracerForm_Load(object sender, EventArgs e)
         {
             this.Show();
-            var rayTracer = new RayTracer.RayTracer(width, height, (int x, int y, System.Drawing.Color color) =>
-            {
-                bitmap.SetPixel(x, y, color);
-                if (x == 0) pictureBox.Refresh();
-            });
-            rayTracer.Render(rayTracer.DefaultScene);
-            pictureBox.Invalidate();
 
+            Tracer.render(width, height, SetPixel, Scenes.defaultScene);
+            pictureBox.Invalidate();
+        }
+
+        private void SetPixel(int x, int y, System.Drawing.Color color)
+        {
+            bitmap.SetPixel(x, y, color);
+            if (x == 0) pictureBox.Refresh();
         }
     }
 }
