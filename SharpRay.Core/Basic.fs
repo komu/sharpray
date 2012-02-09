@@ -1,54 +1,4 @@
-﻿namespace SharpRay.Core.Basic
-open System
-
-type Vector =
-    struct
-        val X: float
-        val Y: float
-        val Z: float
-
-        new(x, y, z) = { X=x; Y=y; Z=z }
-
-        static member (~-) (v: Vector) = Vector(-v.X, -v.Y, -v.Z)
-        static member (*) (s: float, v: Vector) = Vector(s*v.X, s*v.Y, s*v.Z)
-        static member (*) (v: Vector, s: float) = Vector(s*v.X, s*v.Y, s*v.Z)
-        static member (/) (v: Vector, s: float) = v * (1.0/s)
-        static member (+) (v: Vector, u: Vector) = Vector(v.X+u.X, v.Y+u.Y, v.Z+u.Z);
-        static member (-) (v: Vector, u: Vector) = Vector(v.X-u.X, v.Y-u.Y, v.Z-u.Z);
-    end
-
-module Vec =
-    let dot   (v: Vector) (u: Vector) = v.X*u.X + v.Y*u.Y + v.Z*u.Z
-    let cross (v: Vector) (u: Vector) = Vector(v.Y*u.Z - v.Z*u.Y, v.Z*u.X - v.X*u.Z, v.X*u.Y - v.Y*u.X)
-
-    let magnitudeSquared v = dot v v
-    let magnitude v        = magnitudeSquared v |> Math.Sqrt
-    let normalize v        = v / magnitude v
-
-type Color =
-    struct
-        val R: float
-        val G: float
-        val B: float
-
-        new(r, g, b) = { R=r; G=g; B=b }
-
-        static member (*) (s: float, c: Color) = Color(s*c.R, s*c.G, s*c.B)
-        static member (*) (c: Color, s: float) = Color(s*c.R, s*c.G, s*c.B)
-        static member (/) (c: Color, s: float) = c * (1.0/s)
-        static member (+) (c1: Color, c2: Color) = Color(c1.R+c2.R, c1.G+c2.G, c1.B+c2.B);
-        static member (-) (c1: Color, c2: Color) = Color(c1.R-c2.R, c1.G-c2.G, c1.B-c2.B);
-        static member (*) (c1: Color, c2: Color) = Color(c1.R*c2.R, c1.G*c2.G, c1.B*c2.B);
-    end
-
-module Col =
-    let black = Color(0.0, 0.0, 0.0)
-    let white = Color(1.0, 1.0, 1.0)
-    let background = black
-
-    let toDrawingColor (c: Color) =
-        let trim d = Math.Min(d, 1.0) * 255.0 |> int
-        System.Drawing.Color.FromArgb(trim c.R, trim c.G, trim c.B)
+﻿namespace SharpRay.Core
 
 type Ray(start: Vector, dir: Vector) =
     member r.Start = start
@@ -62,16 +12,16 @@ type Surface =
 
 module Surfaces =
     let shiny = { new Surface with
-        member x.Diffuse v = Col.white
+        member x.Diffuse v = Color.White
         member x.Specular v = Color(0.5, 0.5, 0.5)
         member x.Reflect v = 0.5
         member x.Roughness = 50.0
     }
 
     let checkerboard = { new Surface with
-        member x.Diffuse p = if (Math.Floor(p.Z) + Math.Floor(p.X)) % 2.0 <> 0.0 then Col.white else Col.black
-        member x.Reflect p = if (Math.Floor(p.Z) + Math.Floor(p.X)) % 2.0 <> 0.0 then 0.1 else 0.7
-        member x.Specular _ = Col.white
+        member x.Diffuse p = if (floor p.Z + floor p.X) % 2.0 <> 0.0 then Color.White else Color.Black
+        member x.Reflect p = if (floor p.Z + floor p.X) % 2.0 <> 0.0 then 0.1 else 0.7
+        member x.Specular _ = Color.White
         member x.Roughness = 150.0
     }
 
@@ -114,7 +64,7 @@ type Plane(normal: Vector, offset: float, surface: Surface) =
                 then None
                 else Some(Intersection(x, ray, ((Vec.dot normal ray.Start) + offset) / -denom))
 
-type Sphere(center: Vector, radius: Double, surface: Surface) =
+type Sphere(center: Vector, radius: float, surface: Surface) =
     interface SceneObject with
         member x.Surface = surface
         member x.Normal p = Vec.normalize(p - center)
@@ -125,13 +75,14 @@ type Sphere(center: Vector, radius: Double, surface: Surface) =
                 then None
                 else
                     let disc = radius**2.0 - ((Vec.dot eo eo) - v**2.0)
-                    let dist = if disc < 0.0 then 0.0 else v - Math.Sqrt(disc)
+                    let dist = if disc < 0.0 then 0.0 else v - sqrt disc
                     if dist = 0.0 then None else Some (Intersection(x, ray, dist))
 
 type Scene(things: SceneObject array, lights: Light array, camera: Camera) =
     member x.Things = things
     member x.Lights = lights
     member x.Camera = camera
+    member x.BackgroundColor = Color.Black
 
 type ScreenDimensions(width: int, height: int) =
     let recenterX (x: float) = (x - (float width / 2.0)) / (2.0 * float width)
@@ -144,37 +95,38 @@ type ScreenDimensions(width: int, height: int) =
 module Tracer =
     let MaxDepth = 5
 
-    let intersections (ray: Ray) (scene: Scene): Intersection seq = 
-        scene.Things 
+    let inline square x = x*x
+
+    let intersect (ray: Ray) (scene: Scene): Intersection option =
+        let isects =
+            scene.Things 
             |> Seq.map (fun obj -> obj.Intersect(ray))
             |> Seq.filter (fun obj -> obj.IsSome)
             |> Seq.map (fun obj -> obj.Value)
-            |> Seq.sortBy (fun obj -> obj.Dist)
+        if Seq.isEmpty isects then None else Some (Seq.minBy (fun o -> o.Dist) isects)
 
-    let testRay (ray: Ray) (scene: Scene): float =
-        let isects = intersections ray scene
-        if Seq.isEmpty isects 
-            then 0.0
-            else (Seq.head isects).Dist
+    let testRay ray scene =
+        match intersect ray scene with
+        | None   -> 0.0
+        | Some x -> x.Dist
 
-    let rec traceRay (ray: Ray) (scene: Scene) (depth: int): Color =
-        let isects = intersections ray scene
-        if Seq.isEmpty isects 
-            then Col.background
-            else shade (Seq.head isects) scene depth
+    let rec traceRay ray scene depth =
+        match intersect ray scene with
+        | None   -> scene.BackgroundColor
+        | Some x -> shade x scene depth
 
     and naturalColor (thing: SceneObject) (pos: Vector) (norm: Vector) (rd: Vector) (scene: Scene) =
-        let mutable ret = Col.black
+        let mutable ret = Color.Black
         for light in scene.Lights do
             let ldis = light.Pos - pos
             let livec = Vec.normalize ldis
             let neatIntersection = testRay (Ray(pos, livec)) scene
-            let visible = (neatIntersection**2.0 > Vec.magnitudeSquared ldis) || (neatIntersection = 0.0)
+            let visible = (square neatIntersection > ldis.MagnitudeSquared) || (neatIntersection = 0.0)
             if visible then
                 let illum = Vec.dot livec norm
-                let lcolor = if illum > 0.0 then illum * light.Color else Col.black
+                let lcolor = if illum > 0.0 then illum * light.Color else Color.Black
                 let specular = Vec.dot livec (Vec.normalize rd)
-                let scolor = if specular > 0.0 then specular**thing.Surface.Roughness * light.Color else Col.black
+                let scolor = if specular > 0.0 then specular**thing.Surface.Roughness * light.Color else Color.Black
                 ret <- ret + thing.Surface.Diffuse(pos)*lcolor + thing.Surface.Specular(pos)*scolor
         ret
 
@@ -186,7 +138,7 @@ module Tracer =
         let pos = (isect.Dist * isect.Ray.Dir) + isect.Ray.Start
         let normal = isect.Thing.Normal(pos)
         let reflectDir = d - (2.0 * (Vec.dot normal d) * normal)
-        let ret = Col.black
+        let ret = Color.Black
         let ret = ret + naturalColor isect.Thing pos normal reflectDir scene
         if depth >= MaxDepth
             then ret + Color(0.5, 0.5, 0.5)
@@ -198,7 +150,7 @@ module Tracer =
         for y in 0..screenHeight-1 do
             for x in 0..screenWidth-1 do
                 let color = traceRay (Ray(scene.Camera.Pos, (screen.GetPoint (float x) (float y) scene.Camera))) scene 0
-                setPixel.Invoke(x, y, Col.toDrawingColor color)
+                setPixel.Invoke(x, y, color.AsDrawingColor)
 
 module Scenes =
     let defaultScene =

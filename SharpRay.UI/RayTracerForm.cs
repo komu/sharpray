@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using Microsoft.FSharp.Core;
-using SharpRay.Core.Basic;
+using SharpRay.Core;
 
 namespace SharpRay.UI
 {

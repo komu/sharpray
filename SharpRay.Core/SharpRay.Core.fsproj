@@ -40,6 +40,8 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Color.fs" />
+    <Compile Include="Vector.fs" />
     <Compile Include="Basic.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>
